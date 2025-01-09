@@ -32,11 +32,12 @@ def main(cfg):
     work_dir = Path.cwd()
     print(f"work_dir: {work_dir}")
     logger = Logger(work_dir, log_to_wandb=cfg.log_to_wandb, project_name=cfg.project_name)
+    is_atari=cfg.is_atari
 
 
     utils.set_seed_everywhere(cfg.seed)
 
-    env_spec = utils.get_env_spec(cfg.env)
+    env_spec = utils.get_env_spec(cfg.env,is_atari)
 
     (
         offline_trajs,
@@ -47,6 +48,7 @@ def main(cfg):
         action_unavailable_out_dist,
     ) = load_dataset(
         cfg.env,
+        is_atari,
         action_available_perc=cfg.data.action_available_perc,
         action_available_threshold=cfg.data.action_available_threshold,
     )

@@ -439,6 +439,7 @@ def setup_action_label(
 
 def load_dataset(
     env_name,
+    atari=False,
     action_available_perc=1.0,
     action_available_threshold=0.5,
     folder="../../../dataset",
@@ -447,17 +448,11 @@ def load_dataset(
     dataset_path = f"{folder}/{env_name}.pkl"
     with open(dataset_path, "rb") as f:
         trajectories = pickle.load(f)
-
-    states, traj_lens, returns = [], [], []
-    for path in trajectories:
-        states.append(path["observations"])
-        traj_lens.append(len(path["observations"]))
-        returns.append(path["rewards"].sum())
-    traj_lens, returns = np.array(traj_lens), np.array(returns)
-
-    # used for input normalization
-    states = np.concatenate(states, axis=0)
-    state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+        
+    if atari:
+        traj_lens, returns, state_mean, state_std = _process_atari(trajectories)
+    else:
+        traj_lens, returns, state_mean, state_std = _process_mujoco(trajectories)
     num_timesteps = sum(traj_lens)
 
     print("=" * 50)
@@ -468,17 +463,10 @@ def load_dataset(
     print(f"Average length: {np.mean(traj_lens):.2f}, std: {np.std(traj_lens):.2f}")
     print(f"Max length: {np.max(traj_lens):.2f}, min: {np.min(traj_lens):.2f}")
     print("=" * 50)
-
-    sorted_inds = np.argsort(returns)  # lowest to highest
-    num_trajectories = 1
-    timesteps = traj_lens[sorted_inds[-1]]
-    ind = len(trajectories) - 2
-    while ind >= 0 and timesteps + traj_lens[sorted_inds[ind]] < num_timesteps:
-        timesteps += traj_lens[sorted_inds[ind]]
-        num_trajectories += 1
-        ind -= 1
-    sorted_inds = sorted_inds[-num_trajectories:]
-    trajectories = [trajectories[ii] for ii in sorted_inds]
+    
+    
+#删掉回报最的traj，然后剩下的traj 由returns 从低到高进行排列
+    trajectories = _filter_trajectories(trajectories, traj_lens, returns, num_timesteps)
 
     (
         action_available_ind,
@@ -498,3 +486,47 @@ def load_dataset(
         action_unavailable_in_dist,
         action_unavailable_out_dist,
     )
+
+def _filter_trajectories(trajectories, traj_lens, returns, num_timesteps):
+    """根据回报筛选轨迹。"""
+    sorted_inds = np.argsort(returns)  # 从低到高排序
+    num_trajectories = 1
+    timesteps = traj_lens[sorted_inds[-1]]  # 初始化为回报最高的轨迹长度
+    ind = len(trajectories) - 2
+
+    # 累加轨迹，直到达到总时间步数的限制
+    while ind >= 0 and timesteps + traj_lens[sorted_inds[ind]] < num_timesteps:
+        timesteps += traj_lens[sorted_inds[ind]]
+        num_trajectories += 1
+        ind -= 1
+
+    # 返回筛选后的轨迹
+    sorted_inds = sorted_inds[-num_trajectories:]
+    return [trajectories[ii] for ii in sorted_inds]
+
+def _process_mujoco(trajectories):
+    """处理 MuJoCo 数据的归一化和轨迹信息提取。"""
+    states, traj_lens, returns = [], [], []
+    for path in trajectories:
+        states.append(path["observations"])
+        traj_lens.append(len(path["observations"]))
+        returns.append(path["rewards"].sum())
+    traj_lens, returns = np.array(traj_lens), np.array(returns)
+
+    # 计算状态均值和标准差
+    states = np.concatenate(states, axis=0)
+    state_mean, state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+    return traj_lens, returns, state_mean, state_std
+
+
+def _process_atari(trajectories):
+    
+    traj_lens, returns = [], []
+    for path in trajectories:
+        traj_lens.append(len(path["observations"]))
+        returns.append(path["rewards"].sum())
+    traj_lens, returns = np.array(traj_lens), np.array(returns)
+
+    # 对图像像素值进行归一化
+    state_mean, state_std = 0, 255
+    return traj_lens, returns, state_mean, state_std

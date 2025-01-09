@@ -11,9 +11,10 @@ log_to_wandb: True
 project_name: "ssorl"  # wandb 项目名称
 
 ### experiment
+is_atari: True 
 experiment: default
 seed: 10
-env: hopper-medium-expert-v2
+env: pong-mixed-v4
 
 
 ### training

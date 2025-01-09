@@ -19,20 +19,37 @@ EnvSpec = namedtuple(
 )
 
 
-def get_env_spec(env_name):
-    import d4rl
+def get_env_spec(env_name,is_atari=False):
+    
+    if is_atari:
+        import d4rl_atari
+        env = gym.make(env_name)
+    
+        # 获取观测空间的形状 (通常为图像的维度)
+        state_dim = env.observation_space.shape  # 如 (84, 84, 4)
+    
+        # 获取动作空间的数量 (离散动作)
+        act_dim = env.action_space.n  # 如 6
+        action_range = [0, act_dim - 1]
+        
+        max_episode_len = env.spec.max_episode_steps
+        env.close()
+        target_entropy = -act_dim
+    else:
+        
+        import d4rl
 
-    env = gym.make(env_name)
-    state_dim = env.observation_space.shape[0]
-    act_dim = env.action_space.shape[0]
-    action_range = [
-        float(env.action_space.low.min()) + 1e-6,
-        float(env.action_space.high.max()) - 1e-6,
-    ]
-    max_episode_len = env._max_episode_steps
-    env.close()
-    target_entropy = -act_dim
-    return EnvSpec(state_dim, act_dim, action_range, target_entropy, max_episode_len)
+        env = gym.make(env_name)
+        state_dim = env.observation_space.shape[0]
+        act_dim = env.action_space.shape[0]
+        action_range = [
+            float(env.action_space.low.min()) + 1e-6,
+            float(env.action_space.high.max()) - 1e-6,
+        ]
+        max_episode_len = env._max_episode_steps
+        env.close()
+        target_entropy = -act_dim
+        return EnvSpec(state_dim, act_dim, action_range, target_entropy, max_episode_len)
 
 
 def make_eval_env(env_name, seed, target_goal=None):
