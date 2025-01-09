@@ -190,3 +190,59 @@ class SquashedNormal(pyd.transformed_distribution.TransformedDistribution):
         # action_dim), sum up along the action dimensions
         # Return tensor shape: (batch_size)
         return self.log_prob(x).sum(axis=1)
+
+class CategoricalDistribution(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dims, spectral_norms, dropout=0.0):
+        super().__init__()
+        self.logits = nn.Sequential(
+            *mlp(input_dim, output_dim, hidden_dims, spectral_norms, dropout)
+        )
+
+    def forward(self, obs):
+        logits = self.logits(obs)  # 输出每个动作的logits
+        return torch.distributions.Categorical(logits=logits)
+    
+class CNNBasedCategoricalDistribution(nn.Module):
+    def __init__(
+        self, 
+        input_channels, 
+        cnn_output_dim, 
+        output_dim, 
+        hidden_dims, 
+        spectral_norms, 
+        dropout=0.0
+    ):
+        super().__init__()
+        self.cnn = CNNFeatureExtractor(input_channels, cnn_output_dim)
+        self.categorical = CategoricalDistribution(
+            input_dim=cnn_output_dim, 
+            output_dim=output_dim, 
+            hidden_dims=hidden_dims, 
+            spectral_norms=spectral_norms, 
+            dropout=dropout
+        )
+
+    def forward(self, obs):
+        features = self.cnn(obs)  # 提取图像特征
+        dist = self.categorical(features)  # 构建分类分布
+        return dist
+    
+    
+class CNNFeatureExtractor(nn.Module):
+    """
+    CNN 模块，用于提取图像特征。
+    """
+    def __init__(self, input_channels, output_dim):
+        super(CNNFeatureExtractor, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=8, stride=4)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.fc = nn.Linear(64 * 7 * 7, output_dim)  # 假设输入图像为 (4, 84, 84)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.conv3(x))
+        x = x.view(x.size(0), -1)  # 展平
+        x = self.fc(x)
+        return x

@@ -14,7 +14,7 @@ env_names = [
 
 for env_name in env_names:
     print(f"\n===== Processing {env_name} =====")
-    env = gym.make(env_name)
+    env = gym.make(env_name,stack=True)
     dataset = env.get_dataset()
     
     N = dataset["rewards"].shape[0]

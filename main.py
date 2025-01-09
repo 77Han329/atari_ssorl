@@ -86,20 +86,35 @@ def main(cfg):
     else:
         raise NotImplementedError
 
-    inverse_models = []
-    for ii in range(cfg.inverse_model.ensemble_size):
-        inverse_models.append(
-            mlp.DiagGaussianDistribution(
-                input_dim=cfg.model.state_dim
-                * (cfg.inverse_model.num_past_transitions + 2),
-                output_dim=cfg.model.act_dim,
-                hidden_dims=cfg.inverse_model.hidden_dims,
-                spectral_norms=cfg.inverse_model.spectral_norms,
-                action_range=env_spec.action_range,
-                dropout=cfg.inverse_model.dropout,
-            ).to(device=cfg.device)
-        )
-
+    if not is_atari:
+        inverse_models = []
+        for ii in range(cfg.inverse_model.ensemble_size):
+            inverse_models.append(
+                mlp.DiagGaussianDistribution(
+                    input_dim=cfg.model.state_dim
+                    * (cfg.inverse_model.num_past_transitions + 2),
+                    output_dim=cfg.model.act_dim,
+                    hidden_dims=cfg.inverse_model.hidden_dims,
+                    spectral_norms=cfg.inverse_model.spectral_norms,
+                    action_range=env_spec.action_range,
+                    dropout=cfg.inverse_model.dropout,
+                ).to(device=cfg.device)
+            )
+    else:
+        inverse_models = []
+        for ii in range(cfg.inverse_model.ensemble_size):
+            inverse_models.append(
+                mlp.CNNBasedCategoricalDistribution(
+                    input_channels=cfg.inverse_model.input_channels,  # 输入图像通道数
+                    cnn_output_dim=cfg.inverse_model.cnn_output_dim,  # CNN 特征维度
+                    output_dim=cfg.inverse_model.act_dim,  # 动作类别数量
+                    hidden_dims=cfg.inverse_model.hidden_dims,
+                    spectral_norms=cfg.inverse_model.spectral_norms,
+                    dropout=cfg.inverse_model.dropout,
+                ).to(cfg.device)
+            )
+        
+    
     print("\n\n Make Eval Env\n\n")
     if cfg.model.name == "dt":
         eval_env = utils_dt.make_eval_envs(cfg.env, cfg.num_eval_episodes)
