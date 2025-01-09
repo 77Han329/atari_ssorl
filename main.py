@@ -31,7 +31,8 @@ def main(cfg):
 
     work_dir = Path.cwd()
     print(f"work_dir: {work_dir}")
-    logger = Logger(work_dir, log_to_tb=cfg.log_to_tb)
+    logger = Logger(work_dir, log_to_wandb=cfg.log_to_wandb, project_name=cfg.project_name)
+
 
     utils.set_seed_everywhere(cfg.seed)
 

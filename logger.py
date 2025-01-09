@@ -8,29 +8,38 @@ LICENSE.md file in the root directory of this source tree.
 import csv
 import pickle
 from pathlib import Path
+import wandb
 
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 
 
 class Logger:
-    def __init__(self, log_path: Path, log_to_tb=False):
+    def __init__(self, log_path: Path, log_to_wandb=False,project_name="default_projectname"):
 
         self.log_path = log_path
 
-        if log_to_tb:
-            self.writer = SummaryWriter(self.log_path / "tensorboard")
+        #if log_to_tb:
+        #    self.writer = SummaryWriter(self.log_path / "tensorboard")
+        #else:
+        #    self.writer = None
+        # 初始化 wandb
+        if log_to_wandb:
+            wandb.init(project=project_name,entity="ssorl", dir=str(log_path))
+            self.log_to_wandb = True
         else:
-            self.writer = None
+            self.log_to_wandb = False
 
     def log_metrics(self, outputs, iter_num, csv_file_name, print_output):
         if print_output:
             for k, v in outputs.items():
                 print(f"{k}: {v}")
-        for k, v in outputs.items():
-            if self.writer:
-                self.writer.add_scalar(k, v, iter_num)
-
+        #for k, v in outputs.items():
+        #    if self.writer:
+        #        self.writer.add_scalar(k, v, iter_num)
+        if self.log_to_wandb:
+            wandb.log({**outputs, "iter": iter_num})
+            
         csv_file_path = self.log_path / csv_file_name
         self.log_to_csv(outputs, csv_file_path)
 

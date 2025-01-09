@@ -6,7 +6,9 @@ defaults:
 device: cuda
 partition: learnfair
 num_eval_episodes: 30
-log_to_tb: True
+log_to_tb: False  
+log_to_wandb: True
+project_name: "ssorl"  # wandb 项目名称
 
 ### experiment
 experiment: default
