@@ -56,6 +56,7 @@ class TransitionDataset(torch.utils.data.Dataset):
         num_past_transitions=0,
         sampling_ind=None,
         action_available_ind=None,
+        is_atari=False
     ):
 
         super(TransitionDataset, self).__init__()
@@ -68,6 +69,7 @@ class TransitionDataset(torch.utils.data.Dataset):
             action_range,
             max_episode_len,
             num_past_transitions,
+            is_atari
         )
 
         self.sampling_ind = sampling_ind
@@ -81,6 +83,7 @@ class TransitionDataset(torch.utils.data.Dataset):
         action_range,
         max_episode_len,
         num_past_transitions,
+        is_atari
     ):
 
         transitions = []
@@ -103,6 +106,7 @@ class TransitionDataset(torch.utils.data.Dataset):
                         state_std,
                         action_range,
                         num_past_transitions,
+                        is_atari
                     )
                 )
             transitions.append(traj_transitions)
@@ -130,6 +134,7 @@ class TransitionDatasetForShuffling(TransitionDataset):
         action_range,
         max_episode_len,
         num_past_transitions,
+        is_atari
     ):
 
         super(TransitionDatasetForShuffling, self).__init__(
@@ -141,6 +146,7 @@ class TransitionDatasetForShuffling(TransitionDataset):
             action_range,
             max_episode_len,
             num_past_transitions=num_past_transitions,
+            is_atari=is_atari,
         )
         self.transitions = [
             transition for traj_trans in self.transitions for transition in traj_trans
@@ -376,41 +382,81 @@ def get_transition(
     state_std,
     action_range,
     num_past_transitions=0,
+    is_atari=False
 ):
-    if num_past_transitions == 0:
-        ss = traj["observations"][si].reshape(-1)
+    if is_atari:
+        if num_past_transitions == 0:
+            ss = traj["observations"][si]
 
-    elif num_past_transitions > 0:
-        traj_len = len(traj["observations"])
-        # need to offset by 1 due to python syntax
-        upper = min(traj_len, (si + 1) + 1)
-        max_len = num_past_transitions + 2
-        lower = max(0, si - num_past_transitions)
-        ss = traj["observations"][lower:upper].reshape(-1, state_dim)
-        tlen = ss.shape[0]
-        ss = np.concatenate([np.zeros((max_len - tlen, state_dim)), ss])
-        ss = ss.reshape(-1, state_dim)
+        elif num_past_transitions > 0:
+            traj_len = len(traj["observations"])#atari 535 si0
+            # need to offset by 1 due to python syntax
+            upper = min(traj_len, (si + 1) + 1)
+            max_len = num_past_transitions + 2
+            lower = max(0, si - num_past_transitions)
+            ss = traj["observations"][lower:upper]#2,4,84,84
+            tlen = ss.shape[0]
+            # 如果时间步不足，用零帧填充
+            padding = np.zeros((max_len - tlen, *ss.shape[1:]))  # shape: [padding_steps, C, H, W]
+            ss = np.concatenate([padding, ss], axis=0)  # shape: [max_len, C, H, W
+            
+        ss = (ss - state_mean) / state_std
+        ss = torch.from_numpy(ss).to(dtype=torch.float32)
 
-    ss = (ss - state_mean) / state_std
-    ss = torch.from_numpy(ss).to(dtype=torch.float32)
+        next_ss = traj["next_observations"][si]
+        next_ss = (next_ss - state_mean) / state_std
+        next_ss = torch.from_numpy(next_ss).to(dtype=torch.float32)
 
-    next_ss = traj["next_observations"][si].reshape(-1)
-    next_ss = (next_ss - state_mean) / state_std
-    next_ss = torch.from_numpy(next_ss).to(dtype=torch.float32)
+        aa = traj["actions"][si].reshape(-1)
+        aa = torch.from_numpy(aa).to(dtype=torch.float32).clamp(*action_range)
 
-    aa = traj["actions"][si].reshape(-1)
-    aa = torch.from_numpy(aa).to(dtype=torch.float32).clamp(*action_range)
+        rr = traj["rewards"][si].reshape(-1)
+        rr = torch.from_numpy(rr).to(dtype=torch.float32)
 
-    rr = traj["rewards"][si].reshape(-1)
-    rr = torch.from_numpy(rr).to(dtype=torch.float32)
+        avg_rtgg = avg_rtg[si].reshape(-1)
+        avg_rtgg = torch.from_numpy(avg_rtgg).to(dtype=torch.float32)
 
-    avg_rtgg = avg_rtg[si].reshape(-1)
-    avg_rtgg = torch.from_numpy(avg_rtgg).to(dtype=torch.float32)
+        not_done = 1.0 - traj["terminals"][si].reshape(-1)
+        not_done = torch.from_numpy(not_done).to(dtype=torch.float32)
 
-    not_done = 1.0 - traj["terminals"][si].reshape(-1)
-    not_done = torch.from_numpy(not_done).to(dtype=torch.float32)
+        return ss, next_ss, aa, rr, avg_rtgg, not_done
+        
+    else:
+        
+        if num_past_transitions == 0:
+            ss = traj["observations"][si].reshape(-1)
 
-    return ss, next_ss, aa, rr, avg_rtgg, not_done
+        elif num_past_transitions > 0:
+            traj_len = len(traj["observations"])#atari 535 si0
+            # need to offset by 1 due to python syntax
+            upper = min(traj_len, (si + 1) + 1)
+            max_len = num_past_transitions + 2
+            lower = max(0, si - num_past_transitions)
+            ss = traj["observations"][lower:upper].reshape(-1, state_dim)#2,4,84,84
+            tlen = ss.shape[0]
+            ss = np.concatenate([np.zeros((max_len - tlen, state_dim)), ss])
+            ss = ss.reshape(-1, state_dim)
+
+        ss = (ss - state_mean) / state_std
+        ss = torch.from_numpy(ss).to(dtype=torch.float32)
+
+        next_ss = traj["next_observations"][si].reshape(-1)
+        next_ss = (next_ss - state_mean) / state_std
+        next_ss = torch.from_numpy(next_ss).to(dtype=torch.float32)
+
+        aa = traj["actions"][si].reshape(-1)
+        aa = torch.from_numpy(aa).to(dtype=torch.float32).clamp(*action_range)
+
+        rr = traj["rewards"][si].reshape(-1)
+        rr = torch.from_numpy(rr).to(dtype=torch.float32)
+
+        avg_rtgg = avg_rtg[si].reshape(-1)
+        avg_rtgg = torch.from_numpy(avg_rtgg).to(dtype=torch.float32)
+
+        not_done = 1.0 - traj["terminals"][si].reshape(-1)
+        not_done = torch.from_numpy(not_done).to(dtype=torch.float32)
+
+        return ss, next_ss, aa, rr, avg_rtgg, not_done
 
 
 def setup_action_label(

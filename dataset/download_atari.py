@@ -34,7 +34,11 @@ for i in range(N):
     # 收集 step 数据
     for k in ["observations", "actions", "rewards", "terminals"]:
         data_[k].append(dataset[k][i])
-
+    if i < N - 1:
+        data_["next_observations"].append(dataset["observations"][i + 1])
+    else:
+        # 最后一帧的 next_observations 复制当前帧
+        data_["next_observations"].append(dataset["observations"][i])
     # 判断是否是轨迹结束
     done_bool = bool(dataset["terminals"][i])
     if done_bool or i == N - 1:  # 如果到达轨迹终点或数据集的最后一帧

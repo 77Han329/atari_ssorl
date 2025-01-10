@@ -50,6 +50,8 @@ def main(cfg):
     cfg.model.state_dim = env_spec.state_dim
     cfg.model.act_dim = env_spec.act_dim
     cfg.model.action_range = env_spec.action_range
+    if is_atari:
+        input_channels=env_spec.state_dim[0]
     # if is_atari:
     #     if cfg.model.name=="cql":
     #         model = hydra.utils.instantiate(cfg.model)
@@ -112,9 +114,9 @@ def main(cfg):
         for ii in range(cfg.inverse_model.ensemble_size):
             inverse_models.append(
                 mlp.CNNBasedCategoricalDistribution(
-                    input_channels=cfg.inverse_model.input_channels,  # 输入图像通道数
+                    input_channels=input_channels,  # 输入图像通道数
                     cnn_output_dim=cfg.inverse_model.cnn_output_dim,  # CNN 特征维度
-                    output_dim=cfg.inverse_model.act_dim,  # 动作类别数量
+                    output_dim=cfg.model.act_dim,  # 动作类别数量
                     hidden_dims=cfg.inverse_model.hidden_dims,
                     spectral_norms=cfg.inverse_model.spectral_norms,
                     dropout=cfg.inverse_model.dropout,
