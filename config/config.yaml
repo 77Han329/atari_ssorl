@@ -33,6 +33,7 @@ inverse_model:
     num_past_transitions: 1
     validation_perc: 0.1
     dropout: 0.1
+    cnn_output_dim: 32
 
 
 ### data
