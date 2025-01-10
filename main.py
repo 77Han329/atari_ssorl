@@ -114,7 +114,7 @@ def main(cfg):
         for ii in range(cfg.inverse_model.ensemble_size):
             inverse_models.append(
                 mlp.CNNBasedCategoricalDistribution(
-                    input_channels=input_channels,  # 输入图像通道数
+                    input_channels=input_channels* (cfg.inverse_model.num_past_transitions + 2),  # 输入图像通道数
                     cnn_output_dim=cfg.inverse_model.cnn_output_dim,  # CNN 特征维度
                     output_dim=cfg.model.act_dim,  # 动作类别数量
                     hidden_dims=cfg.inverse_model.hidden_dims,

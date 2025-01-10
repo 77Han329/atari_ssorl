@@ -27,7 +27,7 @@ def train_inverse_model(
 ):
     if cfg.is_atari:
         def inverse_model_loss(ahat_dist, a):
-            return -ahat_dist.log_likelihood(a).mean()
+            return -ahat_dist.log_prob(a).mean()  # 分类分布损失
 
         def _eval(eval_dataloader, inverse_model):
 
@@ -38,10 +38,9 @@ def train_inverse_model(
                 eval_dataloader
             ):
                 if cfg.inverse_model.num_past_transitions == 0:
-                    next_states = next_states.reshape(next_states.shape[0], -1)
                     inputs = torch.cat([states_seq, next_states], dim=1)
                 else:
-                    inputs = states_seq.reshape(states_seq.shape[0], -1)
+                    inputs = states_seq
 
                 ahat = inverse_model(inputs.to(cfg.device))
                 loss = inverse_model_loss(ahat, actions.to(cfg.device))
@@ -113,10 +112,10 @@ def train_inverse_model(
                     inverse_model.train()
                     # states_seq = states_seq.reshape(states_seq.shape[0], -1)
                     if cfg.inverse_model.num_past_transitions == 0:
-                        next_states = next_states.reshape(next_states.shape[0], -1)
+                        
                         inputs = torch.cat([states_seq, next_states], dim=1)
                     else:
-                        inputs = states_seq.reshape(states_seq.shape[0], -1)
+                        inputs = states_seq
 
                     ahat = inverse_model(inputs.to(cfg.device))
 
