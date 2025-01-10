@@ -34,57 +34,64 @@ def main(cfg):
     logger = Logger(work_dir, log_to_wandb=cfg.log_to_wandb, project_name=cfg.project_name)
     is_atari=cfg.is_atari
 
-
     utils.set_seed_everywhere(cfg.seed)
 
     env_spec = utils.get_env_spec(cfg.env,is_atari)
 
     (
-        offline_trajs,
-        state_mean,
-        state_std,
+        offline_trajs,#atari 745 observation.shape is [number of obs in i-th traj,4,84,84]
+        state_mean,#0
+        state_std,#255
         action_available_ind,
         action_unavailable_in_dist,
         action_unavailable_out_dist,
-    ) = load_dataset(
-        cfg.env,
-        is_atari,
-        action_available_perc=cfg.data.action_available_perc,
-        action_available_threshold=cfg.data.action_available_threshold,
-    )
+    ) = load_dataset(cfg.env,is_atari,action_available_perc=cfg.data.action_available_perc,action_available_threshold=cfg.data.action_available_threshold,)
 
     cfg.model.state_dim = env_spec.state_dim
     cfg.model.act_dim = env_spec.act_dim
     cfg.model.action_range = env_spec.action_range
-    if cfg.model.name == "td3bc":
-        # actor and critic are sent to the device in the initialization function
-        model = hydra.utils.instantiate(cfg.model)
-        actor_optimizer = torch.optim.Adam(model.actor.parameters(), lr=3e-4)
-        critic_optimizer = torch.optim.Adam(model.critic.parameters(), lr=3e-4)
-        # defined inside TD3BC training code
-        loss_fn = None
-    elif cfg.model.name == "cql":
-        model = hydra.utils.instantiate(cfg.model)
-        policy_optimizer = torch.optim.Adam(
-            model.actor.parameters(),
-            1e-4,
-        )
-        qf_optimizer = torch.optim.Adam(
-            list(model.qf1.parameters()) + list(model.qf2.parameters()), 3e-4
-        )
-        alpha_optimizer = torch.optim.Adam(model.log_alpha.parameters(), 3e-4)
-        loss_fn = None
-    elif cfg.model.name == "dt":
-        cfg.model.n_inner = cfg.model.hidden_size * 4
-        cfg.model.target_entropy = env_spec.target_entropy
-        model = hydra.utils.instantiate(cfg.model).to(device=cfg.device)
-        optimizer, log_temperature_optimizer, scheduler = utils_dt.create_optimizer(
-            model, cfg
-        )
-        loss_fn = utils_dt.create_loss_function(cfg.model.stochastic_policy)
-        reward_scale = 1 if "antmaze" in cfg.env else 0.001
-    else:
-        raise NotImplementedError
+    # if is_atari:
+    #     if cfg.model.name=="cql":
+    #         model = hydra.utils.instantiate(cfg.model)
+    #         policy_optimizer = torch.optim.Adam(
+    #             model.actor.parameters(),
+    #             1e-4,
+    #         )
+    #         qf_optimizer = torch.optim.Adam(
+    #             list(model.qf1.parameters()) + list(model.qf2.parameters()), 3e-4
+    #         )
+    #         alpha_optimizer = torch.optim.Adam(model.log_alpha.parameters(), 3e-4)
+    #         loss_fn = None
+    # else: 
+    #     if cfg.model.name == "td3bc":
+    #         # actor and critic are sent to the device in the initialization function
+    #         model = hydra.utils.instantiate(cfg.model)
+    #         actor_optimizer = torch.optim.Adam(model.actor.parameters(), lr=3e-4)
+    #         critic_optimizer = torch.optim.Adam(model.critic.parameters(), lr=3e-4)
+    #         # defined inside TD3BC training code
+    #         loss_fn = None
+    #     elif cfg.model.name == "cql":
+    #         model = hydra.utils.instantiate(cfg.model)
+    #         policy_optimizer = torch.optim.Adam(
+    #             model.actor.parameters(),
+    #             1e-4,
+    #         )
+    #         qf_optimizer = torch.optim.Adam(
+    #             list(model.qf1.parameters()) + list(model.qf2.parameters()), 3e-4
+    #         )
+    #         alpha_optimizer = torch.optim.Adam(model.log_alpha.parameters(), 3e-4)
+    #         loss_fn = None
+    #     elif cfg.model.name == "dt":
+    #         cfg.model.n_inner = cfg.model.hidden_size * 4
+    #         cfg.model.target_entropy = env_spec.target_entropy
+    #         model = hydra.utils.instantiate(cfg.model).to(device=cfg.device)
+    #         optimizer, log_temperature_optimizer, scheduler = utils_dt.create_optimizer(
+    #             model, cfg
+    #         )
+    #         loss_fn = utils_dt.create_loss_function(cfg.model.stochastic_policy)
+    #         reward_scale = 1 if "antmaze" in cfg.env else 0.001
+    #     else:
+    #         raise NotImplementedError
 
     if not is_atari:
         inverse_models = []

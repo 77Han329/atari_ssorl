@@ -1,5 +1,5 @@
 defaults:
-    - model: td3bc
+    - model: cql
     - override hydra/launcher: submitit_local
 
 ### setup
@@ -14,7 +14,7 @@ project_name: "ssorl"  # wandb 项目名称
 is_atari: True 
 experiment: default
 seed: 10
-env: pong-mixed-v4
+env: breakout-medium-v4
 
 
 ### training

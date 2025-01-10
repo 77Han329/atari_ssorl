@@ -1,67 +1,54 @@
+"""
+Copyright (c) Meta Platforms, Inc. and affiliates.
+
+This source code is licensed under the CC BY-NC license found in the
+LICENSE.md file in the root directory of this source tree.
+"""
+
 import gym
 import numpy as np
 import collections
 import pickle
-import d4rl_atari
+import d4rl_atari  # 与 d4rl 对应的 Atari 扩展库
 
-env_names = [
-    "pong-mixed-v4",
-    "breakout-medium-v4",
-    "breakout-expert-v4",
-    # 如果还有其他，比如 "pong-mixed-v0", ...
-    # 你也可以写在这里
-]
+# 你可以根据需要来调整以下环境列表
+# 例如: "breakout-expert-v0", "breakout-medium-v0", "breakout-mixed-v0", "breakout-full-v0"
+# 以及其他已经在 d4rl_atari 中支持的环境
+env_name = "breakout-medium-v4"
+env = gym.make(env_name,stack=True)
+dataset = env.get_dataset()
 
-for env_name in env_names:
-    print(f"\n===== Processing {env_name} =====")
-    env = gym.make(env_name,stack=True)
-    dataset = env.get_dataset()
-    
-    N = dataset["rewards"].shape[0]
-    print(f"Total steps in dataset: {N}")
-    
-    data_ = collections.defaultdict(list)
-    paths = []
-    episode_step = 0
+# 打印键信息
+print(f"Keys in dataset: {list(dataset.keys())}")
 
-    for i in range(N):
-        done_bool = bool(dataset["terminals"][i])
-        
-        if "next_observations" not in dataset:
-            next_obs = (
-                dataset["observations"][i+1] if (i < N - 1) else dataset["observations"][i]
-            )
-        else:
-            next_obs = dataset["next_observations"][i]
-            
-        data_["observations"].append(dataset["observations"][i])
-        data_["actions"].append(dataset["actions"][i])
-        data_["rewards"].append(dataset["rewards"][i])
-        data_["terminals"].append(dataset["terminals"][i])
-        data_["next_observations"].append(next_obs) 
-        
-        if done_bool:
-            episode_data = {}
-            for k in data_:
-                episode_data[k] = np.array(data_[k])
-            paths.append(episode_data)
+# 检查每个键的长度
+for k in dataset.keys():
+    print(f"{k}: {len(dataset[k])}")
 
-            # 重置临时缓存
-            data_ = collections.defaultdict(list)
-            episode_step = 0
-        else:
-            episode_step += 1
-            
+# 轨迹收集
+data_ = collections.defaultdict(list)
+paths = []
+
+N = len(dataset["observations"])
+for i in range(N):
+    # 收集 step 数据
+    for k in ["observations", "actions", "rewards", "terminals"]:
+        data_[k].append(dataset[k][i])
+
+    # 判断是否是轨迹结束
+    done_bool = bool(dataset["terminals"][i])
+    if done_bool or i == N - 1:  # 如果到达轨迹终点或数据集的最后一帧
+        episode_data = {k: np.array(v) for k, v in data_.items()}
+        paths.append(episode_data)
+        data_ = collections.defaultdict(list)
+
+# 打印轨迹统计信息
+print(f"Number of trajectories collected: {len(paths)}")
+if paths:
     returns = np.array([np.sum(p["rewards"]) for p in paths])
-    num_samples = np.sum([p["rewards"].shape[0] for p in paths])
-    print(f"Number of samples collected: {num_samples}")
-    print(
-        f"Trajectory returns: mean = {returns.mean():.2f}, "
-        f"std = {returns.std():.2f}, max = {returns.max():.2f}, min = {returns.min():.2f}"
-    )
+    print(f"Trajectory returns: mean = {np.mean(returns)}, max = {np.max(returns)}, min = {np.min(returns)}")
 
-    # 存到本地 pkl 文件
-    out_name = f"{env_name}.pkl"
-    with open(out_name, "wb") as f:
-        pickle.dump(paths, f)
-    print(f"Saved {env_name} offline data to {out_name}")
+# 保存到文件
+with open(f"{env_name}.pkl", "wb") as f:
+    pickle.dump(paths, f)
+print(f"Saved {len(paths)} trajectories to {env_name}.pkl")
